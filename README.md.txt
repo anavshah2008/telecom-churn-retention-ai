@@ -1,0 +1,78 @@
+# A-Retain AI: CLV-Weighted Proactive Telecom Churn Retention Engine
+
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
+![LightGBM](https://img.shields.io/badge/LightGBM-ROC--AUC%200.6946-brightgreen)
+![XGBoost](https://img.shields.io/badge/XGBoost-ROC--AUC%200.6931-informational)
+![Status](https://img.shields.io/badge/GCI%20World%202026-Final%20Assignment-orange)
+
+## Executive Summary
+Developed for **GCI World 2026 (University of Tokyo)**, this project diagnoses subscriber attrition for a 100,000-subscriber wireless telecom operator (**Company A**, observing a **49.56% churn rate**) and proposes **A-Retain AI**—a Customer Lifetime Value (CLV) weighted machine learning intervention system.
+
+By combining domain-specific behavioral velocity features with a **LightGBM Classifier**, the system identifies high-risk, high-ARPU subscribers 31–60 days prior to cancellation and matches them to targeted retention levers, projecting **$4.38M in Net Annualized Value (758% ROI)**.
+
+---
+
+## Key Pain Points Identified (EDA)
+1. **The Hardware Lifecycle Cliff:** Churn spikes sharply once current handset age (`eqpdays`) exceeds **360 days**, compounded among users with refurbished devices (`refurb_new == 'R'`).
+2. **Overage "Bill Shock":** Subscribers whose overage revenue (`ovrrev_Mean`) exceeds **15% of total monthly billing (`rev_Mean`)** exhibit severe 31–60 day attrition.
+3. **Silent Usage Contraction & Network Friction:** Steep negative drops in 3-month vs. 6-month voice usage (`change_mou`) and high dropped/blocked call ratios (`drop_blk_Mean / attempt_Mean`) precede cancellation by 30–60 days.
+
+![EDA Charts](assets/chart1_eda.png)
+
+---
+
+## Custom Feature Engineering
+To capture non-linear behavioral decay without division-by-zero or infinity errors, 8 domain ratios were engineered:
+* `overage_rev_ratio`: `ovrrev_Mean / clip(rev_Mean, lower=1.0)` — Measures monthly bill-shock intensity.
+* `mrc_to_rev_ratio`: `totmrc_Mean / clip(rev_Mean, lower=1.0)` — Ratio of base recurring charge to total spend.
+* `call_failure_rate`: `drop_blk_Mean / (attempt_Mean + 1.0)` — Network quality friction index.
+* `call_completion_rate`: `complete_Mean / (attempt_Mean + 1.0)` — Successful call completion reliability.
+* `mou_Contraction_Ratio`: `(avg3mou - avg6mou) / (avg6mou + 1.0)` — Short-term usage decay velocity.
+* `rev_Contraction_Ratio`: `(avg3rev - avg6rev) / (avg6rev + 1.0)` — Revenue contraction velocity.
+* `eqp_to_tenure_ratio`: `eqpdays / (months * 30.5)` — Identifies overdue handset upgrades relative to tenure.
+* `active_sub_ratio`: `actvsubs / clip(uniqsubs, lower=1.0)` — Household account utilization ratio.
+
+---
+
+## Machine Learning Model Benchmark
+Four classification algorithms were evaluated using a **Stratified 80/20 Train-Test Split** (`random_state=42`) across 100,000 merged records (`Client.csv` + `Record.csv`):
+
+| Rank | Model | ROC-AUC | Accuracy | Precision | Recall | F1-Score |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: |
+| **1** | **LightGBM Classifier (Selected)** | **0.6946** | **63.70%** | **0.6294** | **0.6505** | **0.6398** |
+| 2 | XGBoost Classifier | 0.6931 | 63.49% | 0.6273 | 0.6488 | 0.6379 |
+| 3 | Random Forest | 0.6716 | 61.84% | 0.6034 | 0.6709 | 0.6354 |
+| 4 | Logistic Regression | 0.6281 | 59.27% | 0.5916 | 0.5758 | 0.5836 |
+
+![ROC Curve Comparison](assets/chart2_roc.png)
+![Feature Importance](assets/chart3_importance.png)
+
+---
+
+## Prescriptive Business Solution: "A-Retain AI"
+Instead of blanket discounts that cannibalize margins, **A-Retain AI** segments subscribers via a **2x2 Risk-Value Matrix** ($P(\text{churn}) \ge 0.58$ and Monthly ARPU $\ge \$50$) and triggers three automated interventions:
+
+1. **Pillar A — "Smart-Swap" Device Subsidy (`eqpdays > 360` or `refurb_new == 'R'`):** Automated $35 handset trade-in credit with a 12-month contract lock-in.
+2. **Pillar B — "Right-Plan" Bill-Shock Shield (`overage_rev_ratio > 15%`):** Proactive SMS waiving 50% of current overage fees upon upgrading to a higher base `totmrc` tier.
+3. **Pillar C — "VIP Network Care" Recovery (`call_failure_rate > 8%`):** Priority engineering ticket + 500 bonus off-peak minutes.
+
+### Quantified ROI Impact
+* **Target Priority Segment:** 15,000 High-Risk, High-Value Subscribers (Mean ARPU = $65/mo; $11.70M annual revenue at risk).
+* **Net Saved Subscribers:** 2,625 users/year (50% offer acceptance $\times$ 35% net save lift).
+* **24-Month LTV Revenue Preserved:** $4.10M
+* **Replacement CAC Avoided ($300/user):** +$0.79M
+* **Total Intervention Cost:** -$0.51M
+* **Net Annualized Value:** **$4.38 Million (758% ROI)**
+
+---
+
+## Repository Contents & Usage
+* `notebooks/GCI_World_2026_Churn_PoC.ipynb`: Full end-to-end Google Colab notebook (EDA, feature engineering, 4-model training, and automated PDF/PPTX slide generation).
+* `deliverables/anavshah2008.pdf` & `anavshah2008.pptx`: Automated 14-slide executive consulting presentation.
+* `assets/`: High-resolution plots generated by the pipeline.
+
+### Running Locally
+```bash
+git clone [https://github.com/anavshah2008/telecom-churn-retention-ai.git](https://github.com/anavshah2008/telecom-churn-retention-ai.git)
+cd telecom-churn-retention-ai
+pip install -r requirements.txt
